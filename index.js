@@ -1,70 +1,56 @@
 const fs = require('fs');
-const readline = require('readline');
 
-function readIntegersFromFile(filename) {
-    return new Promise((resolve, reject) => {
-        const integers = [];
-        const rl = readline.createInterface({
-            input: fs.createReadStream(filename),
-            crlfDelay: Infinity
-        });
+function readFile(filename) {
+    try {
+        const data = fs.readFileSync(filename, 'utf8');
+        return data.split('\n').map(line => line.trim()).filter(line => line !== '');
+    } catch (error) {
+        throw new Error(`Error reading file: ${error.message}`);
+    }
+}
 
-        rl.on('line', (line) => {
-            const strippedLine = line.trim();
-            const parts = strippedLine.split(/\s+/);
-            if (parts.length !== 1) {
-                return;
-            }
-            try {
-                const number = parseInt(parts[0], 10);
-                if (!isNaN(number)) {
-                    integers.push(number);
-                }
-            } catch (error) {
-                // Skip lines that don't contain a valid integer
-            }
-        });
-
-        rl.on('close', () => {
-            resolve(integers);
-        });
-
-        rl.on('error', (error) => {
-            reject(error);
-        });
-    });
+function parseInteger(line) {
+    const number = parseInt(line, 10);
+    if (isNaN(number) || !Number.isInteger(number) || number < -1023 || number > 1023) {
+        throw new Error(`Invalid input: ${line}`);
+    }
+    return number;
 }
 
 function findDuplicates(integers) {
+    const duplicates = [];
     const seen = new Set();
-    const duplicates = new Set();
+
     for (const number of integers) {
-        if (seen.has(number)) {
-            duplicates.add(number);
+        if (seen.has(number) && !duplicates.includes(number)) {
+            duplicates.push(number);
         } else {
             seen.add(number);
         }
     }
-    return Array.from(duplicates).sort((a, b) => a - b);
+
+    return duplicates.sort((a, b) => a - b);
 }
 
-function writeDuplicatesToFile(duplicates, outputFilename) {
-    const fileContent = duplicates.join('\n') + '\n';
-    fs.writeFileSync(outputFilename, fileContent);
-}
-
-async function processFile(inputFilename, outputFilename) {
+function writeToFile(filename, data) {
     try {
-        const integers = await readIntegersFromFile(inputFilename);
+        fs.writeFileSync(filename, data.join('\n') + '\n');
+    } catch (error) {
+        throw new Error(`Error writing to file: ${error.message}`);
+    }
+}
+
+function processFile(inputFilename, outputFilename) {
+    try {
+        const lines = readFile(inputFilename);
+        const integers = lines.map(parseInteger);
         const duplicates = findDuplicates(integers);
-        writeDuplicatesToFile(duplicates, outputFilename);
+        writeToFile(outputFilename, duplicates.map(String));
     } catch (error) {
         console.error(`Error processing file: ${error.message}`);
     }
 }
 
-// Example usage
 const inputFilename = 'sample_data.txt';
-const outputFilename = 'result.txt'; // Changed the output filename here
+const outputFilename = 'sample_results.txt';
 processFile(inputFilename, outputFilename);
-
